@@ -1,0 +1,76 @@
+import boto3
+import uuid
+
+# Create an S3 client using Boto3
+s3_client = boto3.client('s3')
+
+
+def lambda_handler(event, context):
+    """
+    AWS Lambda function triggered when a file is uploaded to S3.
+
+    Workflow:
+    1. Receive the uploaded file event from S3
+    2. Download the file to Lambda temporary storage
+    3. Process the file (currently no image resizing yet)
+    4. Upload the processed file to another S3 bucket
+    """
+
+    # ------------------------------------------------------------------
+    # Get source bucket name and uploaded file key from the S3 event
+    # ------------------------------------------------------------------
+    source_bucket = event['Records'][0]['s3']['bucket']['name']
+    file_key = event['Records'][0]['s3']['object']['key']
+
+    # ------------------------------------------------------------------
+    # Define destination bucket and output filename
+    # ------------------------------------------------------------------
+    destination_bucket = "my-resized-images-99"
+
+    # Create a new filename for the processed image
+    processed_file_key = f"resized-{file_key}"
+
+    # ------------------------------------------------------------------
+    # Define temporary local paths inside Lambda (/tmp directory)
+    # ------------------------------------------------------------------
+    download_path = f"/tmp/{uuid.uuid4()}-{file_key}"
+    upload_path = f"/tmp/resized-{file_key}"
+
+    # ------------------------------------------------------------------
+    # Download the uploaded file from S3 to Lambda temporary storage
+    # ------------------------------------------------------------------
+    s3_client.download_file(
+        source_bucket,
+        file_key,
+        download_path
+    )
+
+    # ------------------------------------------------------------------
+    # File processing section
+    # Currently: Uploading the same file without modification
+    # Future step: Add image resizing using Pillow library
+    # ------------------------------------------------------------------
+
+    # Upload the file to the destination bucket
+    s3_client.upload_file(
+        download_path,
+        destination_bucket,
+        processed_file_key
+    )
+
+    # ------------------------------------------------------------------
+    # Print success log to CloudWatch
+    # ------------------------------------------------------------------
+    print(
+        f"File '{file_key}' successfully processed "
+        f"and uploaded to '{destination_bucket}' "
+        f"as '{processed_file_key}'"
+    )
+
+    # ------------------------------------------------------------------
+    # Return Lambda execution response
+    # ------------------------------------------------------------------
+    return {
+        "statusCode": 200,
+        "body": "File processed successfully"
+    }
